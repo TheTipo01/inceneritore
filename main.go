@@ -112,7 +112,7 @@ func ready(s *discordgo.Session, _ *discordgo.Ready) {
 // Carica i config per i server
 func load(db *sql.DB) {
 	var (
-		serverId string
+		serverID string
 		ruolo    string
 		testuale string
 		vocale   string
@@ -126,17 +126,17 @@ func load(db *sql.DB) {
 	}
 
 	for rows.Next() {
-		err = rows.Scan(&serverId, &nome, &ruolo, &testuale, &vocale, &invito)
+		err = rows.Scan(&serverID, &nome, &ruolo, &testuale, &vocale, &invito)
 		if err != nil {
 			log.Println("Error scanning rows from query,", err)
 			continue
 		}
 
-		if lastKick[serverId] == nil {
-			lastKick[serverId] = make(map[string]*time.Time)
+		if lastKick[serverID] == nil {
+			lastKick[serverID] = make(map[string]*time.Time)
 		}
 
-		config[serverId] = Config{
+		config[serverID] = Config{
 			ruolo:    ruolo,
 			testuale: testuale,
 			vocale:   vocale,
@@ -293,14 +293,14 @@ func guildMemberAdd(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
 }
 
 // Provvede all'inserimento dell'incenerito nel DB
-func insertionUser(UserID string, serverId string) {
+func insertionUser(UserID string, serverID string) {
 
 	statement, err := database.Prepare("INSERT INTO inceneriti (UserID, TimeStamp, serverId) VALUES (?, ?, ?)")
 	if err != nil {
 		log.Println("Error preparing query,", err)
 	}
 
-	_, err = statement.Exec(UserID, time.Now(), serverId)
+	_, err = statement.Exec(UserID, time.Now(), serverID)
 	if err != nil {
 		log.Println("Error inserting into the database,", err)
 	}
