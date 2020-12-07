@@ -159,3 +159,5 @@ config.yml
 audio_cache/
 *.db
 dist/
+inceneritore
+main
