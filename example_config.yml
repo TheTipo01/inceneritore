@@ -4,3 +4,10 @@ token: ""
 # DataSourceName, aka mysql db to use
 # Example: "user:pass@tcp(127.0.0.1:3306)/db"
 datasourcename: ""
+
+# Driver for the database
+# The only one packed in the program right now is mysql
+drivername: "mysql"
+
+#Log level. Possible value are error, warning, informational and debug
+loglevel: "informational"

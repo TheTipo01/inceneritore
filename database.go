@@ -1,8 +1,8 @@
 package main
 
 import (
-	"database/sql"
-	"log"
+	"github.com/bwmarrin/lit"
+	"time"
 )
 
 const (
@@ -12,15 +12,52 @@ const (
 	tblUtenti     = "CREATE TABLE IF NOT EXISTS `utenti` (  `UserID` varchar(18) NOT NULL,  `Name` varchar(32) NOT NULL,  PRIMARY KEY (`UserID`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
 )
 
-func execQuery(query string, db *sql.DB) {
-	statement, err := db.Prepare(query)
+// Executes a simple query
+func execQuery(query string) {
+	stm, err := db.Prepare(query)
 	if err != nil {
-		log.Println("Error preparing query,", err)
+		lit.Error("Error preparing query, %s", err)
 		return
 	}
 
-	_, err = statement.Exec()
+	_, err = stm.Exec()
 	if err != nil {
-		log.Println("Error creating table,", err)
+		lit.Error("Error creating table, %s", err)
+	}
+
+	_ = stm.Close()
+}
+
+// Loads Config for all the servers
+func loadConfig() {
+	var (
+		serverID string
+		ruolo    string
+		testuale string
+		vocale   string
+		invito   string
+		nome     string
+	)
+
+	rows, err := db.Query("SELECT * FROM config")
+	if err != nil {
+		lit.Error("Error querying db, %s", err)
+	}
+
+	for rows.Next() {
+		err = rows.Scan(&serverID, &nome, &ruolo, &testuale, &vocale, &invito)
+		if err != nil {
+			lit.Error("Error scanning rows from query, %s", err)
+			continue
+		}
+
+		config[serverID] = Config{
+			ruolo:    ruolo,
+			testuale: testuale,
+			vocale:   vocale,
+			invito:   invito,
+			nome:     nome,
+			lastKick: make(map[string]*time.Time),
+		}
 	}
 }
