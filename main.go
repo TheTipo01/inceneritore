@@ -80,11 +80,19 @@ func main() {
 		return
 	}
 
-	dg.AddHandler(voiceStateUpdate)
-	dg.AddHandler(messageCreate)
-	dg.AddHandler(guildMemberAdd)
+	// Add events handler
 	dg.AddHandler(ready)
+	dg.AddHandler(voiceStateUpdate)
+	dg.AddHandler(guildMemberAdd)
 
+	// Add commands handler
+	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		if h, ok := commandHandlers[i.Data.Name]; ok {
+			h(s, i)
+		}
+	})
+
+	// Initialize intents that we use
 	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuildMembers | discordgo.IntentsGuildVoiceStates | discordgo.IntentsGuildMessages)
 
 	err = dg.Open()
@@ -92,6 +100,26 @@ func main() {
 		lit.Error("Error opening connection, %s", err)
 		return
 	}
+
+	// Checks for unused commands and deletes them
+	if cmds, err := dg.ApplicationCommands(dg.State.User.ID, ""); err == nil {
+		for _, c := range cmds {
+			if commandHandlers[c.Name] == nil {
+				_ = dg.ApplicationCommandDelete(dg.State.User.ID, "", c.ID)
+				lit.Info("Deleted unused command %s", c.Name)
+			}
+		}
+	}
+
+	// And add commands used
+	lit.Info("Adding used commands...")
+	for _, v := range commands {
+		_, err := dg.ApplicationCommandCreate(dg.State.User.ID, "", v)
+		if err != nil {
+			lit.Error("Cannot create '%v' command: %v", v.Name, err)
+		}
+	}
+	lit.Info("Commands added!")
 
 	// Wait here until CTRL-C or other term signal is received.
 	lit.Info("inceneritore is now running. Press CTRL-C to exit.")
@@ -183,40 +211,6 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	sendMessage(s, v.UserID, v.GuildID)
 }
 
-// Used to generate scoreboard
-func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	if m.Content != "?inceneriti" || m.Author.Bot || m.Author.ID == s.State.User.ID {
-		return
-	}
-
-	var (
-		name string
-		mex  string
-		cont int
-	)
-
-	// Querying db
-	rows, err := db.Query("SELECT Name, Count(inceneriti.UserID) FROM inceneriti, utenti WHERE utenti.UserID = inceneriti.UserID AND serverID=? GROUP BY inceneriti.UserID ORDER BY Count(inceneriti.UserID) DESC", m.GuildID)
-	if err != nil {
-		lit.Error("Error querying db, %s", err)
-	}
-
-	for rows.Next() {
-		err = rows.Scan(&name, &cont)
-		if err != nil {
-			lit.Error("Error scanning rows from query, %s", err)
-			continue
-		}
-
-		mex += name + " - " + strconv.Itoa(cont) + "\n\n"
-	}
-
-	_, err = s.ChannelMessageSend(m.ChannelID, mex)
-	if err != nil {
-		lit.Error("Error sending message, %s", err)
-	}
-}
-
 // Used to add roles&nick back to the user
 func guildMemberAdd(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
 	var roles, nickname string
@@ -252,9 +246,9 @@ func guildMemberAdd(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
 
 // Adds the user to the db, to show stats on the website
 func insertionUser(UserID string, serverID string) {
-	stm, _ := db.Prepare("INSERT INTO inceneriti (UserID, TimeStamp, serverId) VALUES (?, ?, ?)")
+	stm, _ := db.Prepare("INSERT INTO inceneriti (UserID, TimeStamp, serverId) VALUES (?, NOW(), ?)")
 
-	_, err := stm.Exec(UserID, time.Now(), serverID)
+	_, err := stm.Exec(UserID, serverID)
 	if err != nil {
 		lit.Error("Error inserting into the db, %s", err)
 	}
@@ -265,9 +259,8 @@ func insertionUser(UserID string, serverID string) {
 // Send a message in the configured text channel for the guild
 func sendMessage(s *discordgo.Session, userID, guildID string) {
 	var (
-		n       int
-		message string
-		name    string
+		message, name string
+		n             int
 	)
 
 	row := db.QueryRow("SELECT Name FROM utenti WHERE UserID = ?", userID)
