@@ -93,7 +93,7 @@ func main() {
 	})
 
 	// Initialize intents that we use
-	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuildMembers | discordgo.IntentsGuildVoiceStates | discordgo.IntentsGuildMessages)
+	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuildMembers | discordgo.IntentsGuildVoiceStates)
 
 	err = dg.Open()
 	if err != nil {
