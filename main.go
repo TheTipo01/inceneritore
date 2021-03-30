@@ -167,7 +167,7 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	if err != nil {
 		lit.Error("Error adding role, %s", err)
 
-		removeRole(v.UserID, v.GuildID)
+		addRoles(s, m.User.ID, m.GuildID)
 		return
 	}
 
@@ -179,9 +179,7 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	if err != nil {
 		lit.Error("Error getting DM channel id, %s", err)
 
-		_ = s.GuildMemberRoleRemove(v.GuildID, v.UserID, config[v.GuildID].ruolo)
-
-		removeRole(v.UserID, v.GuildID)
+		addRoles(s, m.User.ID, m.GuildID)
 		return
 	}
 
@@ -196,10 +194,7 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	if err != nil {
 		lit.Error("Error kicking user, %s", err)
 
-		//Se non riesco tolgo il ruolo
-		_ = s.GuildMemberRoleRemove(v.GuildID, v.UserID, config[v.GuildID].ruolo)
-
-		removeRole(v.UserID, v.GuildID)
+		addRoles(s, m.User.ID, m.GuildID)
 		return
 	}
 
@@ -211,35 +206,7 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 
 // Used to add roles&nick back to the user
 func guildMemberAdd(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
-	var roles, nickname string
-
-	err := db.QueryRow("SELECT Roles, Nickname FROM roles WHERE UserID=? AND server=?", m.User.ID, m.GuildID).Scan(&roles, &nickname)
-	if err != nil {
-		lit.Error("Error scanning row from query, %s", err)
-	}
-
-	stm, _ := db.Prepare("DELETE FROM roles WHERE UserID=? AND server=?")
-
-	_, err = stm.Exec(m.User.ID, m.GuildID)
-	if err != nil {
-		lit.Error("Error deleting from db, %s", err)
-	}
-
-	_ = stm.Close()
-
-	err = s.GuildMemberNickname(m.GuildID, m.User.ID, nickname)
-	if err != nil {
-		lit.Error("Error changing nickname, %s", err)
-	}
-
-	for _, role := range strings.Split(roles, ",") {
-		if role != config[m.GuildID].ruolo && role != "" {
-			err = s.GuildMemberRoleAdd(m.GuildID, m.User.ID, role)
-			if err != nil {
-				lit.Error("Error adding role, %s", err)
-			}
-		}
-	}
+	addRoles(s, m.User.ID, m.GuildID)
 }
 
 // Adds the user to the db, to show stats on the website
@@ -312,18 +279,6 @@ func saveRoles(m *discordgo.Member, guildID string) {
 	_, err = stm.Exec(m.User.ID, guildID, strings.TrimSuffix(roles, ","), m.Nick)
 	if err != nil {
 		lit.Error("Error inserting into the db, %s", err)
-	}
-
-	_ = stm.Close()
-}
-
-// Removes a given role for a given user
-func removeRole(userID, guildID string) {
-	stm, _ := db.Prepare("DELETE FROM roles WHERE UserID=? AND server=?")
-
-	_, err := stm.Exec(userID, guildID)
-	if err != nil {
-		lit.Error("Error removing from the db, %s", err)
 	}
 
 	_ = stm.Close()
