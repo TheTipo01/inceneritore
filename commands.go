@@ -1,9 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"github.com/bwmarrin/lit"
-	"strconv"
 )
 
 var (
@@ -20,8 +20,8 @@ var (
 		// Prints the ranking of the most incinerated people
 		"inceneriti": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			var (
-				name, mex string
-				cont      int
+				name, mex   string
+				times, cont int
 			)
 
 			// Querying db
@@ -31,13 +31,14 @@ var (
 			}
 
 			for rows.Next() {
-				err = rows.Scan(&name, &cont)
+				cont++
+				err = rows.Scan(&name, &times)
 				if err != nil {
 					lit.Error("Error scanning rows from query, %s", err)
 					continue
 				}
 
-				mex += name + " - " + strconv.Itoa(cont) + "\n\n"
+				mex += fmt.Sprintf("%d) %s - %d\n", cont, name, times)
 			}
 
 			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Ranking", mex).
