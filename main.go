@@ -167,7 +167,7 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	if err != nil {
 		lit.Error("Error adding role, %s", err)
 
-		addRoles(s, m.User.ID, m.GuildID)
+		addRoles(s, v.UserID, v.GuildID)
 		return
 	}
 
@@ -179,7 +179,7 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	if err != nil {
 		lit.Error("Error getting DM channel id, %s", err)
 
-		addRoles(s, m.User.ID, m.GuildID)
+		addRoles(s, v.UserID, v.GuildID)
 		return
 	}
 
@@ -194,7 +194,7 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	if err != nil {
 		lit.Error("Error kicking user, %s", err)
 
-		addRoles(s, m.User.ID, m.GuildID)
+		addRoles(s, v.UserID, v.GuildID)
 		return
 	}
 
