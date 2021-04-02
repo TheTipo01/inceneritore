@@ -15,11 +15,15 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// Variables used for command line parameters
 var (
-	token  string
+	// Discord bot token
+	token string
+	// Config for all of the servers
 	config = make(map[string]Config)
-	db     *sql.DB
+	// Database connection
+	db *sql.DB
+	// Stores if a userID is a bot or not
+	isBot = make(map[string]*bool)
 )
 
 func init() {
@@ -39,6 +43,7 @@ func init() {
 		// Config file found
 		token = viper.GetString("token")
 
+		// Open database
 		db, err = sql.Open(viper.GetString("drivername"), viper.GetString("datasourcename"))
 		if err != nil {
 			lit.Error("Error opening database connection, %s", err)
@@ -95,6 +100,7 @@ func main() {
 	// Initialize intents that we use
 	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuildMembers | discordgo.IntentsGuildVoiceStates)
 
+	// Open discord session
 	err = dg.Open()
 	if err != nil {
 		lit.Error("Error opening connection, %s", err)
@@ -143,7 +149,17 @@ func ready(s *discordgo.Session, _ *discordgo.Ready) {
 // Chiamata quando qualcuno entra o viene spostato in un canale vocale
 func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	// Checks if the voice state update is from the correct channel and the user isn't a bot
-	if user, err := s.User(v.UserID); err == nil && (v.ChannelID != config[v.GuildID].vocale || user.Bot) {
+	if isBot[v.UserID] == nil {
+		user, err := s.User(v.UserID)
+		if err == nil {
+			isBot[v.UserID] = &user.Bot
+		} else {
+			lit.Error("User failed: %s", err.Error())
+			return
+		}
+	}
+
+	if *isBot[v.UserID] || v.ChannelID != config[v.GuildID].vocale {
 		return
 	}
 
