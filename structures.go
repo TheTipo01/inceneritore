@@ -10,4 +10,5 @@ type Config struct {
 	invito   string
 	nome     string
 	lastKick map[string]*time.Time
+	messagge string
 }

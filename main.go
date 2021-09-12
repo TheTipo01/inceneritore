@@ -92,7 +92,7 @@ func main() {
 
 	// Add commands handler
 	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		if h, ok := commandHandlers[i.Data.Name]; ok {
+		if h, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
 			h(s, i)
 		}
 	})
@@ -187,9 +187,6 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 		return
 	}
 
-	// Wait 3 seconds
-	time.Sleep(3 * time.Second)
-
 	// Search for the user private message channel
 	canale, err := s.UserChannelCreate(v.UserID)
 	if err != nil {
@@ -198,6 +195,17 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 		addRoles(s, v.UserID, v.GuildID)
 		return
 	}
+
+	// Check if custom message to send exists
+	if config[v.GuildID].messagge != "" {
+		_, err = s.ChannelMessageSend(canale.ID, config[v.GuildID].messagge)
+		if err != nil {
+			lit.Error("Error sending message, %s", err)
+		}
+	}
+
+	// Wait 3 seconds
+	time.Sleep(3 * time.Second)
 
 	// Send the invite link
 	_, err = s.ChannelMessageSend(canale.ID, config[v.GuildID].invito)
