@@ -146,7 +146,7 @@ func ready(s *discordgo.Session, _ *discordgo.Ready) {
 	}
 }
 
-// Chiamata quando qualcuno entra o viene spostato in un canale vocale
+// Called when someone changes channel or enters one
 func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	// Checks if the voice state update is from the correct channel and the user isn't a bot
 	if isBot[v.UserID] == nil {
