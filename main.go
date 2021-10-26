@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"github.com/bwmarrin/lit"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/spf13/viper"
+	"github.com/kkyr/fig"
 	"os"
 	"os/signal"
 	"strconv"
@@ -15,11 +15,18 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+type Config struct {
+	Token    string `fig:"token" validate:"required"`
+	DSN      string `fig:"datasourcename" validate:"required"`
+	Driver   string `fig:"drivername" validate:"required"`
+	LogLevel string `fig:"loglevel" validate:"required"`
+}
+
 var (
 	// Discord bot token
 	token string
 	// Config for all of the servers
-	config = make(map[string]Config)
+	config = make(map[string]Server)
 	// Database connection
 	db *sql.DB
 	// Stores if a userID is a bot or not
@@ -29,52 +36,44 @@ var (
 func init() {
 	lit.LogLevel = lit.LogError
 
-	viper.SetConfigName("config")
-	viper.SetConfigType("yml")
-	viper.AddConfigPath(".")
-
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			// Config file not found
-			lit.Error("Config file not found! See example_config.yml")
-			return
-		}
-	} else {
-		// Config file found
-		token = viper.GetString("token")
-
-		// Open database
-		db, err = sql.Open(viper.GetString("drivername"), viper.GetString("datasourcename"))
-		if err != nil {
-			lit.Error("Error opening database connection, %s", err)
-			return
-		}
-
-		// Set lit.LogLevel to the given value
-		switch strings.ToLower(viper.GetString("loglevel")) {
-		case "logerror", "error":
-			lit.LogLevel = lit.LogError
-			break
-		case "logwarning", "warning":
-			lit.LogLevel = lit.LogWarning
-			break
-		case "loginformational", "informational":
-			lit.LogLevel = lit.LogInformational
-			break
-		case "logdebug", "debug":
-			lit.LogLevel = lit.LogDebug
-			break
-		}
-
-		// Creates all the tables
-		execQuery(tblInceneriti)
-		execQuery(tblRoles)
-		execQuery(tblUtenti)
-		execQuery(tblConfig)
-
-		// And loads the config for all of the servers
-		loadConfig()
+	var cfg Config
+	err := fig.Load(&cfg, fig.File("config.yml"))
+	if err != nil {
+		lit.Error(err.Error())
+		return
 	}
+
+	// Config file found
+	token = cfg.Token
+
+	// Open database
+	db, err = sql.Open(cfg.Driver, cfg.DSN)
+	if err != nil {
+		lit.Error("Error opening database connection, %s", err)
+		return
+	}
+
+	// Set lit.LogLevel to the given value
+	switch strings.ToLower(cfg.LogLevel) {
+	case "logwarning", "warning":
+		lit.LogLevel = lit.LogWarning
+		break
+	case "loginformational", "informational":
+		lit.LogLevel = lit.LogInformational
+		break
+	case "logdebug", "debug":
+		lit.LogLevel = lit.LogDebug
+		break
+	}
+
+	// Creates all the tables
+	execQuery(tblInceneriti)
+	execQuery(tblRoles)
+	execQuery(tblUtenti)
+	execQuery(tblConfig)
+
+	// And loads the config for all of the servers
+	loadConfig()
 }
 
 func main() {

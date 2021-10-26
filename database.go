@@ -52,7 +52,7 @@ func loadConfig() {
 			continue
 		}
 
-		config[serverID] = Config{
+		config[serverID] = Server{
 			ruolo:    ruolo,
 			testuale: testuale,
 			vocale:   vocale,

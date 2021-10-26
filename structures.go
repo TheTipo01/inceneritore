@@ -2,8 +2,8 @@ package main
 
 import "time"
 
-// Config holds info for a server
-type Config struct {
+// Server holds info for a server
+type Server struct {
 	ruolo    string
 	testuale string
 	vocale   string
