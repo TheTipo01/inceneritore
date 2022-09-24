@@ -67,12 +67,12 @@ func init() {
 	}
 
 	// Creates all the tables
-	execQuery(tblInceneriti)
-	execQuery(tblRoles)
 	execQuery(tblUtenti)
 	execQuery(tblConfig)
+	execQuery(tblInceneriti)
+	execQuery(tblRoles)
 
-	// And loads the config for all of the servers
+	// And loads the config for all the servers
 	loadConfig()
 }
 
@@ -197,7 +197,7 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	saveRoles(m, v.GuildID)
 
 	// Add the role, so the user doesn't move
-	err = s.GuildMemberEdit(v.GuildID, v.UserID, []string{config[v.GuildID].ruolo})
+	_, err = s.GuildMemberEdit(v.GuildID, v.UserID, &discordgo.GuildMemberParams{Roles: &[]string{config[v.GuildID].ruolo}})
 	if err != nil {
 		lit.Error("Error adding role, %s", err)
 

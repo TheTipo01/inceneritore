@@ -41,7 +41,8 @@ func addRoles(s *discordgo.Session, userID, guildID string) {
 		lit.Error("Error changing nickname, %s", err)
 	}
 
-	err = s.GuildMemberEdit(guildID, userID, strings.Split(roles, ","))
+	splittedRoles := strings.Split(roles, ",")
+	_, err = s.GuildMemberEdit(guildID, userID, &discordgo.GuildMemberParams{Roles: &splittedRoles})
 	if err != nil {
 		lit.Error("Error adding role, %s", err)
 	}
