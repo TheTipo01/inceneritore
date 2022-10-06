@@ -20,6 +20,7 @@ type Config struct {
 	DSN      string `fig:"datasourcename" validate:"required"`
 	Driver   string `fig:"drivername" validate:"required"`
 	LogLevel string `fig:"loglevel" validate:"required"`
+	Site     string `fig:"site" validate:"required"`
 }
 
 var (
@@ -31,6 +32,8 @@ var (
 	db *sql.DB
 	// Stores if a userID is a bot or not
 	isBot = make(map[string]*bool)
+	// Playing status
+	site string
 )
 
 func init() {
@@ -45,6 +48,7 @@ func init() {
 
 	// Config file found
 	token = cfg.Token
+	site = cfg.Site
 
 	// Open database
 	db, err = sql.Open(cfg.Driver, cfg.DSN)
@@ -121,7 +125,7 @@ func main() {
 
 func ready(s *discordgo.Session, _ *discordgo.Ready) {
 	// Set the playing status.
-	err := s.UpdateGameStatus(0, "inceneritore.ga")
+	err := s.UpdateGameStatus(0, site)
 	if err != nil {
 		lit.Error("Can't set status, %s", err)
 	}

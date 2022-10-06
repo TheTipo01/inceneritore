@@ -9,5 +9,8 @@ datasourcename: ""
 # The only one packed in the program right now is mysql
 drivername: "mysql"
 
-#Log level. Possible value are error, warning, informational and debug
+# Log level. Possible value are error, warning, informational and debug
 loglevel: "informational"
+
+# Playing status. If you want to change what's shown, change it
+site: "inceneritore.ga"
