@@ -13,6 +13,10 @@ var (
 			Name:        "inceneriti",
 			Description: "Prints the ranking of the most incinerated people",
 		},
+		{
+			Name:        "update",
+			Description: "Updates the username of the user: this is useful if you changed your username.",
+		},
 	}
 
 	// Handler
@@ -42,6 +46,14 @@ var (
 			}
 
 			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Ranking", mex).
+				SetColor(0x7289DA).MessageEmbed, i.Interaction)
+		},
+		// Updates the username of the user: this is useful if you changed your username.
+		"update": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			// Querying db
+			_, _ = db.Query("UPDATE utenti SET Name=? WHERE UserID=?", i.Member.User.Username, i.Member.User.ID)
+
+			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).SetDescription("Updated username!").
 				SetColor(0x7289DA).MessageEmbed, i.Interaction)
 		},
 	}
