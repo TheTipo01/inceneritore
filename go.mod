@@ -1,4 +1,4 @@
-module inceneritore
+module github.com/TheTipo01/inceneritore
 
 go 1.15
 
