@@ -194,7 +194,7 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 
 	// We can't remove the role from a booster user, so we leave it there
 	var guildMemberParams discordgo.GuildMemberParams
-	if m.PremiumSince == nil {
+	if !isPremium(m.Roles, v.GuildID) {
 		guildMemberParams.Roles = &[]string{config[v.GuildID].ruolo}
 	} else {
 		guildMemberParams.Roles = &[]string{config[v.GuildID].ruolo, config[v.GuildID].boostRole}
@@ -248,6 +248,16 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	insertionUser(v.UserID, v.GuildID)
 	// And sends the message on the guild text channel
 	sendMessage(s, v.UserID, v.GuildID)
+}
+
+func isPremium(roles []string, guildID string) bool {
+	for _, r := range roles {
+		if r == config[guildID].boostRole {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Used to add roles&nick back to the user
