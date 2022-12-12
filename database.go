@@ -43,7 +43,7 @@ func loadConfig() {
 
 		s.lastKick = make(map[string]*time.Time)
 
-		err = rows.Scan(&serverID, &s.nome, &s.ruolo, &s.testuale, &s.vocale, &s.invito, &s.messagge)
+		err = rows.Scan(&serverID, &s.nome, &s.ruolo, &s.testuale, &s.vocale, &s.invito, &s.messagge, &s.boostRole)
 		if err != nil {
 			lit.Error("Error scanning rows from query, %s", err)
 			continue
