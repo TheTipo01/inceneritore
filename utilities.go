@@ -27,14 +27,10 @@ func addRoles(s *discordgo.Session, userID, guildID string) {
 		lit.Error("Error scanning row from query, %s", err)
 	}
 
-	stm, _ := db.Prepare("DELETE FROM roles WHERE UserID=? AND server=?")
-
-	_, err = stm.Exec(userID, guildID)
+	_, err = db.Exec("DELETE FROM roles WHERE UserID=? AND server=?", userID, guildID)
 	if err != nil {
 		lit.Error("Error deleting from db, %s", err)
 	}
-
-	_ = stm.Close()
 
 	err = s.GuildMemberNickname(guildID, userID, nickname)
 	if err != nil {

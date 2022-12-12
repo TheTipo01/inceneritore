@@ -15,18 +15,10 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-type Config struct {
-	Token    string `fig:"token" validate:"required"`
-	DSN      string `fig:"datasourcename" validate:"required"`
-	Driver   string `fig:"drivername" validate:"required"`
-	LogLevel string `fig:"loglevel" validate:"required"`
-	Site     string `fig:"site" validate:"required"`
-}
-
 var (
 	// Discord bot token
 	token string
-	// Config for all of the servers
+	// Config for all the servers
 	config = make(map[string]Server)
 	// Database connection
 	db *sql.DB
@@ -200,8 +192,16 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 
 	saveRoles(m, v.GuildID)
 
+	// We can't remove the role from a booster user, so we leave it there
+	var guildMemberParams discordgo.GuildMemberParams
+	if m.PremiumSince == nil {
+		guildMemberParams.Roles = &[]string{config[v.GuildID].ruolo}
+	} else {
+		guildMemberParams.Roles = &[]string{config[v.GuildID].ruolo, config[v.GuildID].boostRole}
+	}
+
 	// Add the role, so the user doesn't move
-	_, err = s.GuildMemberEdit(v.GuildID, v.UserID, &discordgo.GuildMemberParams{Roles: &[]string{config[v.GuildID].ruolo}})
+	_, err = s.GuildMemberEdit(v.GuildID, v.UserID, &guildMemberParams)
 	if err != nil {
 		lit.Error("Error adding role, %s", err)
 
@@ -257,14 +257,10 @@ func guildMemberAdd(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
 
 // Adds the user to the db, to show stats on the website
 func insertionUser(UserID string, serverID string) {
-	stm, _ := db.Prepare("INSERT INTO inceneriti (UserID, TimeStamp, serverId) VALUES (?, NOW(), ?)")
-
-	_, err := stm.Exec(UserID, serverID)
+	_, err := db.Exec("INSERT INTO inceneriti (UserID, TimeStamp, serverId) VALUES (?, NOW(), ?)", UserID, serverID)
 	if err != nil {
 		lit.Error("Error inserting into the db, %s", err)
 	}
-
-	_ = stm.Close()
 }
 
 // Send a message in the configured text channel for the guild
@@ -274,15 +270,13 @@ func sendMessage(s *discordgo.Session, userID, guildID string) {
 		n             int
 	)
 
-	row := db.QueryRow("SELECT Name FROM utenti WHERE UserID = ?", userID)
-	err := row.Scan(&name)
+	err := db.QueryRow("SELECT Name FROM utenti WHERE UserID = ?", userID).Scan(&name)
 	if err != nil {
 		lit.Error("Error scanning rows from query, %s", err)
 		return
 	}
 
-	row = db.QueryRow("SELECT COUNT(*) FROM inceneriti WHERE UserID=? AND serverId=?", userID, guildID)
-	err = row.Scan(&n)
+	err = db.QueryRow("SELECT COUNT(*) FROM inceneriti WHERE UserID=? AND serverId=?", userID, guildID).Scan(&n)
 	if err != nil {
 		lit.Error("Error scanning rows from query, %s", err)
 		return
@@ -306,26 +300,20 @@ func saveRoles(m *discordgo.Member, guildID string) {
 	var roles string
 
 	for _, r := range m.Roles {
-		roles += r + ","
+		if r != config[guildID].boostRole {
+			roles += r + ","
+		}
 	}
 
 	// User
-	stm, _ := db.Prepare("INSERT IGNORE INTO utenti (UserID, Name) VALUES (?, ?)")
-
-	_, err := stm.Exec(m.User.ID, m.User.Username)
+	_, err := db.Exec("INSERT IGNORE INTO utenti (UserID, Name) VALUES (?, ?)", m.User.ID, m.User.Username)
 	if err != nil {
 		lit.Error("Error inserting into the db, %s", err)
 	}
-
-	_ = stm.Close()
 
 	// Role
-	stm, _ = db.Prepare("INSERT INTO roles (UserID, server, Roles, Nickname) VALUES (?, ?, ?, ?)")
-
-	_, err = stm.Exec(m.User.ID, guildID, strings.TrimSuffix(roles, ","), m.Nick)
+	_, err = db.Exec("INSERT INTO roles (UserID, server, Roles, Nickname) VALUES (?, ?, ?, ?)", m.User.ID, guildID, roles[:len(roles)-1], m.Nick)
 	if err != nil {
 		lit.Error("Error inserting into the db, %s", err)
 	}
-
-	_ = stm.Close()
 }
