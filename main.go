@@ -130,6 +130,8 @@ func ready(s *discordgo.Session, _ *discordgo.Ready) {
 
 // Called when someone changes channel or enters one
 func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
+	start := time.Now()
+
 	// Checks if the voice state update is from the correct channel and the user isn't a bot
 	if _, ok := isBot[v.UserID]; ok {
 		user, err := s.User(v.UserID)
@@ -186,8 +188,8 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 		}
 	}
 
-	// Wait 3 seconds
-	time.Sleep(3 * time.Second)
+	// Wait 3 seconds since the start of the function
+	time.Sleep((3 * time.Second) - time.Since(start))
 
 	// Send the invite link
 	_, err = s.ChannelMessageSend(canale.ID, config[v.GuildID].invito)
