@@ -1,8 +1,9 @@
 package main
 
 import (
+	"github.com/bwmarrin/discordgo"
 	"github.com/bwmarrin/lit"
-	"time"
+	"strings"
 )
 
 const (
@@ -13,19 +14,13 @@ const (
 )
 
 // Executes a simple query
-func execQuery(query string) {
-	stm, err := db.Prepare(query)
-	if err != nil {
-		lit.Error("Error preparing query, %s", err)
-		return
+func execQuery(query ...string) {
+	for _, q := range query {
+		_, err := db.Exec(q)
+		if err != nil {
+			lit.Error("Error creating table, %s", err)
+		}
 	}
-
-	_, err = stm.Exec()
-	if err != nil {
-		lit.Error("Error creating table, %s", err)
-	}
-
-	_ = stm.Close()
 }
 
 // Loads Config for all the servers
@@ -41,8 +36,6 @@ func loadConfig() {
 			serverID string
 		)
 
-		s.lastKick = make(map[string]*time.Time)
-
 		err = rows.Scan(&serverID, &s.nome, &s.ruolo, &s.testuale, &s.vocale, &s.invito, &s.messagge, &s.boostRole)
 		if err != nil {
 			lit.Error("Error scanning rows from query, %s", err)
@@ -50,5 +43,39 @@ func loadConfig() {
 		}
 
 		config[serverID] = s
+	}
+}
+
+// Returns the number of times a user has been kicked
+func getIncenerimenti(userID string, guildID string) int {
+	var n int
+
+	_ = db.QueryRow("SELECT COUNT(*) FROM inceneriti WHERE UserID=? AND serverId=?", userID, guildID).Scan(&n)
+
+	return n
+}
+
+// Saves roles of a user
+func saveRoles(m *discordgo.Member, guildID string) {
+	// Remove the booster role if the user has it
+	for i, v := range m.Roles {
+		if v == config[guildID].boostRole {
+			m.Roles = append(m.Roles[:i], m.Roles[i+1:]...)
+			break
+		}
+	}
+
+	roles := strings.Join(m.Roles, ",")
+
+	// User
+	_, err := db.Exec("INSERT IGNORE INTO utenti (UserID, Name) VALUES (?, ?)", m.User.ID, m.User.Username)
+	if err != nil {
+		lit.Error("Error inserting into the db, %s", err)
+	}
+
+	// Role
+	_, err = db.Exec("INSERT INTO roles (UserID, server, Roles, Nickname) VALUES (?, ?, ?, ?)", m.User.ID, guildID, roles, m.Nick)
+	if err != nil {
+		lit.Error("Error inserting into the db, %s", err)
 	}
 }

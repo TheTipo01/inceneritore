@@ -1,7 +1,5 @@
 package main
 
-import "time"
-
 // Server holds info for a server
 type Server struct {
 	ruolo     string
@@ -9,7 +7,6 @@ type Server struct {
 	vocale    string
 	invito    string
 	nome      string
-	lastKick  map[string]*time.Time
 	messagge  string
 	boostRole string
 }

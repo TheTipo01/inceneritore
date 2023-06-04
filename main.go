@@ -23,7 +23,7 @@ var (
 	// Database connection
 	db *sql.DB
 	// Stores if a userID is a bot or not
-	isBot = make(map[string]*bool)
+	isBot = make(map[string]bool)
 	// Playing status
 	site string
 )
@@ -63,10 +63,7 @@ func init() {
 	}
 
 	// Creates all the tables
-	execQuery(tblUtenti)
-	execQuery(tblConfig)
-	execQuery(tblInceneriti)
-	execQuery(tblRoles)
+	execQuery(tblUtenti, tblConfig, tblInceneriti, tblRoles)
 
 	// And loads the config for all the servers
 	loadConfig()
@@ -102,7 +99,15 @@ func main() {
 		return
 	}
 
-	// Wait here until CTRL-C or other term signal is received.
+	// Register commands
+	for _, v := range commands {
+		_, err = dg.ApplicationCommandCreate(dg.State.User.ID, "", v)
+		if err != nil {
+			lit.Error("Can't register command %s: %s", v.Name, err.Error())
+		}
+	}
+
+	// Wait here until CTRL-C or another term signal is received.
 	lit.Info("inceneritore is now running. Press CTRL-C to exit.")
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
@@ -121,69 +126,24 @@ func ready(s *discordgo.Session, _ *discordgo.Ready) {
 	if err != nil {
 		lit.Error("Can't set status, %s", err)
 	}
-
-	// Checks for unused commands and deletes them
-	if cmds, err := s.ApplicationCommands(s.State.User.ID, ""); err == nil {
-		found := false
-
-		for _, l := range commands {
-			found = false
-
-			for _, o := range cmds {
-				// We compare every online command with the ones locally stored, to find if a command with the same name exists
-				if l.Name == o.Name {
-					// If the options of the command are not equal, we re-register it
-					if !isCommandEqual(l, o) {
-						lit.Info("Registering command `%s`", l.Name)
-
-						_, err = s.ApplicationCommandCreate(s.State.User.ID, "", l)
-						if err != nil {
-							lit.Error("Cannot create '%s' command: %s", l.Name, err)
-						}
-					}
-
-					found = true
-					break
-				}
-			}
-
-			// If we didn't found a match for the locally stored command, it means the command is new. We register it
-			if !found {
-				lit.Info("Registering new command `%s`", l.Name)
-
-				_, err = s.ApplicationCommandCreate(s.State.User.ID, "", l)
-				if err != nil {
-					lit.Error("Cannot create '%s' command: %s", l.Name, err)
-				}
-			}
-		}
-	}
 }
 
 // Called when someone changes channel or enters one
 func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	// Checks if the voice state update is from the correct channel and the user isn't a bot
-	if isBot[v.UserID] == nil {
+	if _, ok := isBot[v.UserID]; ok {
 		user, err := s.User(v.UserID)
 		if err == nil {
-			isBot[v.UserID] = &user.Bot
+			isBot[v.UserID] = user.Bot
 		} else {
 			lit.Error("User failed: %s", err.Error())
 			return
 		}
 	}
 
-	if *isBot[v.UserID] || v.ChannelID != config[v.GuildID].vocale {
+	if isBot[v.UserID] || v.ChannelID != config[v.GuildID].vocale {
 		return
 	}
-
-	if config[v.GuildID].lastKick[v.UserID] != nil && time.Now().Sub(*config[v.GuildID].lastKick[v.UserID]) < time.Second {
-		lit.Warn("Event fired twice")
-		return
-	}
-
-	currentTime := time.Now()
-	config[v.GuildID].lastKick[v.UserID] = &currentTime
 
 	m, err := s.GuildMember(v.GuildID, v.UserID)
 	if err != nil {
@@ -218,7 +178,7 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 		return
 	}
 
-	// Check if custom message to send exists
+	// Check if a custom message to send exists
 	if config[v.GuildID].messagge != "" {
 		_, err = s.ChannelMessageSend(canale.ID, config[v.GuildID].messagge)
 		if err != nil {
@@ -245,9 +205,9 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	}
 
 	// Tracks when the user was kicked, to show on the website
-	insertionUser(v.UserID, v.GuildID)
+	insertIncenerimento(v.UserID, v.GuildID)
 	// And sends the message on the guild text channel
-	sendMessage(s, v.UserID, v.GuildID)
+	sendMessage(s, v.UserID, v.GuildID, m.User.Username)
 }
 
 // Used to add roles&nick back to the user
@@ -256,7 +216,7 @@ func guildMemberAdd(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
 }
 
 // Adds the user to the db, to show stats on the website
-func insertionUser(UserID string, serverID string) {
+func insertIncenerimento(UserID string, serverID string) {
 	_, err := db.Exec("INSERT INTO inceneriti (UserID, TimeStamp, serverId) VALUES (?, NOW(), ?)", UserID, serverID)
 	if err != nil {
 		lit.Error("Error inserting into the db, %s", err)
@@ -264,56 +224,24 @@ func insertionUser(UserID string, serverID string) {
 }
 
 // Send a message in the configured text channel for the guild
-func sendMessage(s *discordgo.Session, userID, guildID string) {
+func sendMessage(s *discordgo.Session, userID, guildID, name string) {
 	var (
-		message, name string
-		n             int
+		message string
+		n       int
 	)
 
-	err := db.QueryRow("SELECT Name FROM utenti WHERE UserID = ?", userID).Scan(&name)
-	if err != nil {
-		lit.Error("Error scanning rows from query, %s", err)
-		return
-	}
+	n = getIncenerimenti(userID, guildID)
 
-	err = db.QueryRow("SELECT COUNT(*) FROM inceneriti WHERE UserID=? AND serverId=?", userID, guildID).Scan(&n)
-	if err != nil {
-		lit.Error("Error scanning rows from query, %s", err)
-		return
-	}
-
-	// Otherwise Daniele "rompe il cazzo" for that final vowel if the number is 1
+	// Otherwise, Daniele "rompe il cazzo" for that final vowel if the number is 1
+	message = name + " è stato incenerito.\nÈ stato incenerito " + strconv.Itoa(n)
 	if n == 1 {
-		message = name + " è stato incenerito.\nÈ stato incenerito " + strconv.Itoa(n) + " volta."
+		message += " volta."
 	} else {
-		message = name + " è stato incenerito.\nÈ stato incenerito " + strconv.Itoa(n) + " volte."
+		message += " volte."
 	}
 
-	_, err = s.ChannelMessageSend(config[guildID].testuale, message)
+	_, err := s.ChannelMessageSend(config[guildID].testuale, message)
 	if err != nil {
 		lit.Error("Error sending message, %s", err)
-	}
-}
-
-// Saves roles of a user
-func saveRoles(m *discordgo.Member, guildID string) {
-	var roles string
-
-	for _, r := range m.Roles {
-		if r != config[guildID].boostRole {
-			roles += r + ","
-		}
-	}
-
-	// User
-	_, err := db.Exec("INSERT IGNORE INTO utenti (UserID, Name) VALUES (?, ?)", m.User.ID, m.User.Username)
-	if err != nil {
-		lit.Error("Error inserting into the db, %s", err)
-	}
-
-	// Role
-	_, err = db.Exec("INSERT INTO roles (UserID, server, Roles, Nickname) VALUES (?, ?, ?, ?)", m.User.ID, guildID, roles[:len(roles)-1], m.Nick)
-	if err != nil {
-		lit.Error("Error inserting into the db, %s", err)
 	}
 }

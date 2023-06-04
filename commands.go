@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"github.com/bwmarrin/lit"
+	"strconv"
 )
 
 var (
@@ -24,8 +25,9 @@ var (
 		// Prints the ranking of the most incinerated people
 		"inceneriti": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			var (
-				name, mex   string
+				name        string
 				times, cont int
+				embed       = NewEmbed().SetTitle(s.State.User.Username).SetDescription("Ranking")
 			)
 
 			// Querying db
@@ -42,10 +44,10 @@ var (
 					continue
 				}
 
-				mex += fmt.Sprintf("%d) %s - %d\n", cont, name, times)
+				embed.AddField(strconv.Itoa(cont), fmt.Sprintf("%s - %d", name, times))
 			}
 
-			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).AddField("Ranking", mex).
+			sendEmbedInteraction(s, embed.
 				SetColor(0x7289DA).MessageEmbed, i.Interaction)
 		},
 		// Updates the username of the user: this is useful if you changed your username.
