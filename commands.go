@@ -52,8 +52,16 @@ var (
 		},
 		// Updates the username of the user: this is useful if you changed your username.
 		"update": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			// Querying db
-			_, _ = db.Query("UPDATE utenti SET Name=? WHERE UserID=?", i.Member.User.Username, i.Member.User.ID)
+			var username, id string
+			if i.Member != nil {
+				username = i.Member.User.Username
+				id = i.Member.User.ID
+			} else {
+				username = i.User.Username
+				id = i.User.ID
+			}
+
+			_, _ = db.Query("UPDATE utenti SET Name=? WHERE UserID=?", username, id)
 
 			sendEmbedInteraction(s, NewEmbed().SetTitle(s.State.User.Username).SetDescription("Updated username!").
 				SetColor(0x7289DA).MessageEmbed, i.Interaction)

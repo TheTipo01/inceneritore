@@ -5,6 +5,7 @@ import (
 	"github.com/bwmarrin/lit"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/kkyr/fig"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"os"
 	"os/signal"
 	"strconv"
@@ -19,13 +20,15 @@ var (
 	// Discord bot token
 	token string
 	// Config for all the servers
-	config = make(map[string]Server)
+	config = cmap.New[Server]()
 	// Database connection
 	db *sql.DB
 	// Stores if a userID is a bot or not
-	isBot = make(map[string]bool)
+	isBot = cmap.New[bool]()
 	// Playing status
 	site string
+	// Stores if a user is being incinerated
+	isUserBeingIncinerated = cmap.New[bool]()
 )
 
 func init() {
@@ -48,6 +51,8 @@ func init() {
 		lit.Error("Error opening database connection, %s", err)
 		return
 	}
+
+	db.SetConnMaxLifetime(time.Minute * 3)
 
 	// Set lit.LogLevel to the given value
 	switch strings.ToLower(cfg.LogLevel) {
@@ -100,11 +105,9 @@ func main() {
 	}
 
 	// Register commands
-	for _, v := range commands {
-		_, err = dg.ApplicationCommandCreate(dg.State.User.ID, "", v)
-		if err != nil {
-			lit.Error("Can't register command %s: %s", v.Name, err.Error())
-		}
+	_, err = dg.ApplicationCommandBulkOverwrite(dg.State.User.ID, "", commands)
+	if err != nil {
+		lit.Error("Can't register commands, %s", err)
 	}
 
 	// Wait here until CTRL-C or another term signal is received.
@@ -133,18 +136,29 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	start := time.Now()
 
 	// Checks if the voice state update is from the correct channel and the user isn't a bot
-	if _, ok := isBot[v.UserID]; ok {
+	if isBot.Has(v.UserID) {
 		user, err := s.User(v.UserID)
 		if err == nil {
-			isBot[v.UserID] = user.Bot
+			isBot.Set(v.UserID, user.Bot)
 		} else {
 			lit.Error("User failed: %s", err.Error())
 			return
 		}
 	}
 
-	if isBot[v.UserID] || v.ChannelID != config[v.GuildID].vocale {
+	b, _ := isBot.Get(v.UserID)
+	c, _ := config.Get(v.GuildID)
+
+	if b || v.ChannelID != c.vocale {
 		return
+	}
+
+	// Is the user already being incinerated?
+	if isUserBeingIncinerated.Has(v.UserID) {
+		return
+	} else {
+		isUserBeingIncinerated.Set(v.UserID, true)
+		defer isUserBeingIncinerated.Remove(v.UserID)
 	}
 
 	m, err := s.GuildMember(v.GuildID, v.UserID)
@@ -157,9 +171,9 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	// We can't remove the role from a booster user, so we leave it there
 	var guildMemberParams discordgo.GuildMemberParams
 	if m.PremiumSince == nil {
-		guildMemberParams.Roles = &[]string{config[v.GuildID].ruolo}
+		guildMemberParams.Roles = &[]string{c.ruolo}
 	} else {
-		guildMemberParams.Roles = &[]string{config[v.GuildID].ruolo, config[v.GuildID].boostRole}
+		guildMemberParams.Roles = &[]string{c.ruolo, c.boostRole}
 	}
 
 	// Add the role, so the user doesn't move
@@ -181,8 +195,8 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	}
 
 	// Check if a custom message to send exists
-	if config[v.GuildID].messagge != "" {
-		_, err = s.ChannelMessageSend(canale.ID, config[v.GuildID].messagge)
+	if c.messagge != "" {
+		_, err = s.ChannelMessageSend(canale.ID, c.messagge)
 		if err != nil {
 			lit.Error("Error sending message, %s", err)
 		}
@@ -192,7 +206,7 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	time.Sleep((3 * time.Second) - time.Since(start))
 
 	// Send the invite link
-	_, err = s.ChannelMessageSend(canale.ID, config[v.GuildID].invito)
+	_, err = s.ChannelMessageSend(canale.ID, c.invito)
 	if err != nil {
 		lit.Error("Error sending message, %s", err)
 	}
@@ -242,7 +256,9 @@ func sendMessage(s *discordgo.Session, userID, guildID, name string) {
 		message += " volte."
 	}
 
-	_, err := s.ChannelMessageSend(config[guildID].testuale, message)
+	c, _ := config.Get(guildID)
+
+	_, err := s.ChannelMessageSend(c.testuale, message)
 	if err != nil {
 		lit.Error("Error sending message, %s", err)
 	}

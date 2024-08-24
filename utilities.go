@@ -36,6 +36,16 @@ func addRoles(s *discordgo.Session, userID, guildID string) {
 	}
 
 	splittedRoles := strings.Split(roles, ",")
+
+	// Remove the incenerito role if the user has it
+	c, _ := config.Get(guildID)
+	for i, v := range splittedRoles {
+		if v == c.ruolo {
+			splittedRoles = append(splittedRoles[:i], splittedRoles[i+1:]...)
+			break
+		}
+	}
+
 	_, err = s.GuildMemberEdit(guildID, userID, &discordgo.GuildMemberParams{Roles: &splittedRoles})
 	if err != nil {
 		lit.Error("Error adding role, %s", err)

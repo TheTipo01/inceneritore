@@ -42,7 +42,7 @@ func loadConfig() {
 			continue
 		}
 
-		config[serverID] = s
+		config.Set(serverID, s)
 	}
 }
 
@@ -58,8 +58,10 @@ func getIncenerimenti(userID string, guildID string) int {
 // Saves roles of a user
 func saveRoles(m *discordgo.Member, guildID string) {
 	// Remove the booster role if the user has it
+	c, _ := config.Get(guildID)
+
 	for i, v := range m.Roles {
-		if v == config[guildID].boostRole {
+		if v == c.boostRole {
 			m.Roles = append(m.Roles[:i], m.Roles[i+1:]...)
 			break
 		}
