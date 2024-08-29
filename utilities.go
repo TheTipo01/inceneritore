@@ -1,6 +1,8 @@
 package main
 
 import (
+	"database/sql"
+	"errors"
 	"github.com/bwmarrin/discordgo"
 	"github.com/bwmarrin/lit"
 	"strings"
@@ -22,6 +24,10 @@ func addRoles(s *discordgo.Session, userID, guildID string) {
 
 	err := db.QueryRow("SELECT Roles, Nickname FROM roles WHERE UserID=? AND server=?", userID, guildID).Scan(&roles, &nickname)
 	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			// Nothing to do
+			return
+		}
 		lit.Error("Error scanning row from query, %s", err)
 	}
 
@@ -30,9 +36,12 @@ func addRoles(s *discordgo.Session, userID, guildID string) {
 		lit.Error("Error deleting from db, %s", err)
 	}
 
-	err = s.GuildMemberNickname(guildID, userID, nickname)
-	if err != nil {
-		lit.Error("Error changing nickname, %s", err)
+	// Change nickname, if any
+	if nickname != "" {
+		err = s.GuildMemberNickname(guildID, userID, nickname)
+		if err != nil {
+			lit.Error("Error changing nickname, %s", err)
+		}
 	}
 
 	splittedRoles := strings.Split(roles, ",")
@@ -46,8 +55,11 @@ func addRoles(s *discordgo.Session, userID, guildID string) {
 		}
 	}
 
-	_, err = s.GuildMemberEdit(guildID, userID, &discordgo.GuildMemberParams{Roles: &splittedRoles})
-	if err != nil {
-		lit.Error("Error adding role, %s", err)
+	// Add the roles if the user has any
+	if len(splittedRoles) > 0 {
+		_, err = s.GuildMemberEdit(guildID, userID, &discordgo.GuildMemberParams{Roles: &splittedRoles})
+		if err != nil {
+			lit.Error("Error adding role, %s", err)
+		}
 	}
 }
