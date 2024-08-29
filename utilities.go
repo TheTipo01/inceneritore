@@ -44,7 +44,10 @@ func addRoles(s *discordgo.Session, userID, guildID string) {
 		}
 	}
 
-	splittedRoles := strings.Split(roles, ",")
+	var splittedRoles []string
+	if roles != "" {
+		splittedRoles = strings.Split(roles, ",")
+	}
 
 	// Remove the incenerito role if the user has it
 	c, _ := config.Get(guildID)
