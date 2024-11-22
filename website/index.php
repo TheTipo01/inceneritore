@@ -3,8 +3,8 @@
 <head>
     <title>Inceneritore</title>
     <meta charset="utf-8">
-    <meta content="width=device-width,initial-scale=1"name="viewport">
-    <link href="css/bootstrap.min.css"rel="stylesheet">
+    <meta content="width=device-width,initial-scale=1" name="viewport">
+    <link href="css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
 <div class="container">
@@ -22,10 +22,7 @@
         $result = mysqli_query($connection, $query);
         if (mysqli_num_rows($result) != 0) {
             while ($row = mysqli_fetch_array($result)) {
-                echo "<tr>";
-                echo "<td>$row[Name]</td>";
-                echo "<td>$row[num]</td>";
-                echo "</tr>";
+                echo "<tr><td>".htmlspecialchars(strip_tags($row["Name"]))."</td><td>".htmlspecialchars(strip_tags($row["num"]))."</td></tr>";
             }
         } else {
             mysqli_close($connection);
@@ -48,11 +45,7 @@
         $result = mysqli_query($connection, $query);
         if (mysqli_num_rows($result) != 0) {
             while ($row = mysqli_fetch_array($result)) {
-                echo "<tr>";
-                echo "<td>$row[Name]</td>";
-                echo "<td>$row[TimeStamp]</td>";
-                echo "<td>$row[serverName]</td>";
-                echo "</tr>";
+                echo "<tr><td>".htmlspecialchars(strip_tags($row["Name"]))."</td><td>".htmlspecialchars(strip_tags($row["TimeStamp"]))."</td><td>".htmlspecialchars(strip_tags($row["serverName"]))."</td></tr>";
             }
         } else {
             mysqli_close($connection);
