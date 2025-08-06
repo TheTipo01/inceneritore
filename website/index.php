@@ -18,7 +18,7 @@
         </tr>
         </thead>
         <tbody><?php $connection = mysqli_connect("127.0.0.1", "user", "pass", "database");
-        $query = "SELECT Name, Count(inceneriti.UserID) AS num FROM inceneriti, utenti WHERE utenti.UserID = inceneriti.UserID GROUP BY inceneriti.UserID ORDER BY Count(inceneriti.UserID) DESC";
+        $query = "SELECT Name, Count(incinerated.userID) AS num FROM incinerated, utenti WHERE users.id = incinerated.userID GROUP BY incinerated.userID ORDER BY Count(incinerated.userID) DESC";
         $result = mysqli_query($connection, $query);
         if (mysqli_num_rows($result) != 0) {
             while ($row = mysqli_fetch_array($result)) {
@@ -41,7 +41,7 @@
         </tr>
         </thead>
         <tbody><?php $connection = mysqli_connect("127.0.0.1", "user", "pass", "database");
-        $query = "SELECT utenti.Name AS Name, inceneriti.TimeStamp AS TimeStamp, config.serverName AS serverName FROM inceneriti, config, utenti WHERE config.serverId = inceneriti.serverId AND utenti.UserID = inceneriti.UserID ORDER BY inceneriti.TimeStamp DESC";
+        $query = "SELECT users.name AS Name, incinerated.timestamp AS TimeStamp, servers.name AS serverName FROM incinerated, servers, users WHERE server.id = inceneriti.serverID AND users.id = incinerated.userID ORDER BY incinerated.timestamp DESC";
         $result = mysqli_query($connection, $query);
         if (mysqli_num_rows($result) != 0) {
             while ($row = mysqli_fetch_array($result)) {

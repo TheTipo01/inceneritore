@@ -14,3 +14,14 @@ loglevel: "informational"
 
 # Playing status. If you want to change what's shown, change it
 site: "inceneritore.ga"
+
+# List of servers to manage
+server:
+  - serverID: "12345678901234567"  # Server ID
+    serverName: "My awesome server" # Name of the server
+    role: "123456789012345678" # Role to assign when a user is waiting for incineration, to block them from doing anything
+    textChannel: "123456789012345678" # Text channel where the bot will send messages about people being incinerated
+    voiceChannel: "123456789012345678" # Voice channel where the bot will watch for users to incinerate
+    invite: "https://discord.gg/niceInvite" # Invite link for the server
+    message: "You've been incinerated. Please don't resist." # Message to send privately to the user being incinerated
+    boostRole: "123456789012345678" # Role used in the server for users who boosted it

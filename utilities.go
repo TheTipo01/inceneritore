@@ -3,9 +3,10 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"strings"
+
 	"github.com/bwmarrin/discordgo"
 	"github.com/bwmarrin/lit"
-	"strings"
 )
 
 // Sends embed as response to an interaction
@@ -22,7 +23,7 @@ func sendEmbedInteraction(s *discordgo.Session, embed *discordgo.MessageEmbed, i
 func addRoles(s *discordgo.Session, userID, guildID string) {
 	var roles, nickname string
 
-	err := db.QueryRow("SELECT Roles, Nickname FROM roles WHERE UserID=? AND server=?", userID, guildID).Scan(&roles, &nickname)
+	err := db.QueryRow("SELECT roles, nickname FROM roles WHERE userID=? AND serverID=?", userID, guildID).Scan(&roles, &nickname)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			// Nothing to do
@@ -31,7 +32,7 @@ func addRoles(s *discordgo.Session, userID, guildID string) {
 		lit.Error("Error scanning row from query, %s", err)
 	}
 
-	_, err = db.Exec("DELETE FROM roles WHERE UserID=? AND server=?", userID, guildID)
+	_, err = db.Exec("DELETE FROM roles WHERE userID=? AND serverID=?", userID, guildID)
 	if err != nil {
 		lit.Error("Error deleting from db, %s", err)
 	}
@@ -52,7 +53,7 @@ func addRoles(s *discordgo.Session, userID, guildID string) {
 	// Remove the incenerito role if the user has it
 	c, _ := config.Get(guildID)
 	for i, v := range splittedRoles {
-		if v == c.ruolo {
+		if v == c.Role {
 			splittedRoles = append(splittedRoles[:i], splittedRoles[i+1:]...)
 			break
 		}

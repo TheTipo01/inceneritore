@@ -2,16 +2,17 @@ package main
 
 import (
 	"database/sql"
-	"github.com/bwmarrin/lit"
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/kkyr/fig"
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/bwmarrin/lit"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/kkyr/fig"
+	cmap "github.com/orcaman/concurrent-map/v2"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -20,11 +21,11 @@ var (
 	// Discord bot token
 	token string
 	// Config for all the servers
-	config = cmap.New[Server]()
+	config cmap.ConcurrentMap[string, Server]
 	// Database connection
 	db *sql.DB
 	// Stores if a userID is a bot or not
-	isBot = cmap.New[bool]()
+	isBot *cmap.ConcurrentMap[string, bool]
 	// Playing status
 	site string
 	// Stores if a user is being incinerated
@@ -68,10 +69,19 @@ func init() {
 	}
 
 	// Creates all the tables
-	execQuery(tblUtenti, tblConfig, tblInceneriti, tblRoles)
+	execQuery(tblUsers, tblServers, tblRoles, tblIncinerated)
 
-	// And loads the config for all the servers
-	loadConfig()
+	config = cmap.New[Server]()
+	for _, s := range cfg.Server {
+		config.Set(s.ServerID, s)
+
+		err = saveServer(s.ServerID, s.ServerName)
+		if err != nil {
+			lit.Error("Error saving server %s, %s", s.ServerID, err)
+		}
+	}
+
+	isBot = loadIsBot()
 }
 
 func main() {
@@ -133,13 +143,17 @@ func ready(s *discordgo.Session, _ *discordgo.Ready) {
 
 // Called when someone changes channel or enters one
 func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
-	start := time.Now()
+	start := time.After(time.Second * 3)
 
 	// Checks if the voice state update is from the correct channel and the user isn't a bot
-	if isBot.Has(v.UserID) {
+	if !isBot.Has(v.UserID) {
 		user, err := s.User(v.UserID)
 		if err == nil {
 			isBot.Set(v.UserID, user.Bot)
+			err = saveIsBot(v.UserID, user.Username, user.Bot)
+			if err != nil {
+				lit.Error("Error saving user as bot, %s", err)
+			}
 		} else {
 			lit.Error("User failed: %s", err.Error())
 			return
@@ -149,7 +163,7 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	b, _ := isBot.Get(v.UserID)
 	c, _ := config.Get(v.GuildID)
 
-	if b || v.ChannelID != c.vocale {
+	if b || v.ChannelID != c.VoiceChannel {
 		return
 	}
 
@@ -166,14 +180,17 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 		lit.Error("Error creating member, %s", err)
 	}
 
-	saveRoles(m, v.GuildID)
+	err = saveRoles(m, v.GuildID)
+	if err != nil {
+		lit.Error("Error saving roles, %s", err)
+	}
 
 	// We can't remove the role from a booster user, so we leave it there
 	var guildMemberParams discordgo.GuildMemberParams
 	if m.PremiumSince == nil {
-		guildMemberParams.Roles = &[]string{c.ruolo}
+		guildMemberParams.Roles = &[]string{c.Role}
 	} else {
-		guildMemberParams.Roles = &[]string{c.ruolo, c.boostRole}
+		guildMemberParams.Roles = &[]string{c.Role, c.BoostRole}
 	}
 
 	// Add the role, so the user doesn't move
@@ -195,18 +212,18 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	}
 
 	// Check if a custom message to send exists
-	if c.messagge != "" {
-		_, err = s.ChannelMessageSend(canale.ID, c.messagge)
+	if c.Message != "" {
+		_, err = s.ChannelMessageSend(canale.ID, c.Message)
 		if err != nil {
 			lit.Error("Error sending message, %s", err)
 		}
 	}
 
 	// Wait 3 seconds since the start of the function
-	time.Sleep((3 * time.Second) - time.Since(start))
+	<-start
 
 	// Send the invite link
-	_, err = s.ChannelMessageSend(canale.ID, c.invito)
+	_, err = s.ChannelMessageSend(canale.ID, c.Invite)
 	if err != nil {
 		lit.Error("Error sending message, %s", err)
 	}
@@ -223,7 +240,7 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	// Tracks when the user was kicked, to show on the website
 	insertIncenerimento(v.UserID, v.GuildID)
 	// And sends the message on the guild text channel
-	sendMessage(s, v.UserID, v.GuildID, m.User.Username)
+	sendMessage(s, v.UserID, v.GuildID, m.User.Username, c.TextChannel)
 }
 
 // Used to add roles&nick back to the user
@@ -231,16 +248,8 @@ func guildMemberAdd(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
 	addRoles(s, m.User.ID, m.GuildID)
 }
 
-// Adds the user to the db, to show stats on the website
-func insertIncenerimento(UserID string, serverID string) {
-	_, err := db.Exec("INSERT INTO inceneriti (UserID, TimeStamp, serverId) VALUES (?, NOW(), ?)", UserID, serverID)
-	if err != nil {
-		lit.Error("Error inserting into the db, %s", err)
-	}
-}
-
 // Send a message in the configured text channel for the guild
-func sendMessage(s *discordgo.Session, userID, guildID, name string) {
+func sendMessage(s *discordgo.Session, userID, guildID, name, textChannel string) {
 	var (
 		message string
 		n       int
@@ -256,9 +265,7 @@ func sendMessage(s *discordgo.Session, userID, guildID, name string) {
 		message += " volte."
 	}
 
-	c, _ := config.Get(guildID)
-
-	_, err := s.ChannelMessageSend(c.testuale, message)
+	_, err := s.ChannelMessageSend(textChannel, message)
 	if err != nil {
 		lit.Error("Error sending message, %s", err)
 	}
