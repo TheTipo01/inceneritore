@@ -194,7 +194,11 @@ func NormalIncinerate(s *discordgo.Session, v *discordgo.VoiceStateUpdate, start
 }
 
 func LockdownMode(s *discordgo.Session, v *discordgo.VoiceStateUpdate, start <-chan time.Time, c Server) {
-	if _, ok := c.BlacklistMap[v.UserID]; !ok || v.ChannelID != c.LockdownChannel {
+	if v.ChannelID != c.LockdownChannel {
+		return
+	}
+
+	if _, ok := c.BlacklistMap[v.UserID]; !ok {
 		return
 	}
 
