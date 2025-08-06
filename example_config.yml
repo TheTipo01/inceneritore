@@ -25,3 +25,6 @@ server:
     invite: "https://discord.gg/niceInvite" # Invite link for the server
     message: "You've been incinerated. Please don't resist." # Message to send privately to the user being incinerated
     boostRole: "123456789012345678" # Role used in the server for users who boosted it
+    lockdownChannel: "123456789012345678" # Channel where only the ids in the blacklist will be incinerated
+    lockdownBlacklisted: # List of user IDs that will be incinerated in lockdown mode
+        - "123456789012345678" # User ID of a blacklisted user

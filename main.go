@@ -73,6 +73,13 @@ func init() {
 
 	config = cmap.New[Server]()
 	for _, s := range cfg.Server {
+		if len(s.LockdownBlacklisted) > 0 {
+			s.BlacklistMap = make(map[string]struct{}, len(s.LockdownBlacklisted))
+			for _, v := range s.LockdownBlacklisted {
+				s.BlacklistMap[v] = struct{}{}
+			}
+		}
+
 		config.Set(s.ServerID, s)
 
 		err = saveServer(s.ServerID, s.ServerName)
@@ -145,7 +152,6 @@ func ready(s *discordgo.Session, _ *discordgo.Ready) {
 func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	start := time.After(time.Second * 3)
 
-	// Checks if the voice state update is from the correct channel and the user isn't a bot
 	if !isBot.Has(v.UserID) {
 		user, err := s.User(v.UserID)
 		if err == nil {
@@ -161,9 +167,18 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	}
 
 	b, _ := isBot.Get(v.UserID)
+	if b {
+		return
+	}
+
 	c, _ := config.Get(v.GuildID)
 
-	if b || v.ChannelID != c.VoiceChannel {
+	go NormalIncinerate(s, v, start, c)
+	go LockdownMode(s, v, start, c)
+}
+
+func NormalIncinerate(s *discordgo.Session, v *discordgo.VoiceStateUpdate, start <-chan time.Time, c Server) {
+	if v.ChannelID != c.VoiceChannel {
 		return
 	}
 
@@ -175,6 +190,26 @@ func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 		defer isUserBeingIncinerated.Remove(v.UserID)
 	}
 
+	incinerate(s, v, c, start)
+}
+
+func LockdownMode(s *discordgo.Session, v *discordgo.VoiceStateUpdate, start <-chan time.Time, c Server) {
+	if _, ok := c.BlacklistMap[v.UserID]; !ok || v.ChannelID != c.LockdownChannel {
+		return
+	}
+
+	// Is the user already being incinerated?
+	if isUserBeingIncinerated.Has(v.UserID) {
+		return
+	} else {
+		isUserBeingIncinerated.Set(v.UserID, true)
+		defer isUserBeingIncinerated.Remove(v.UserID)
+	}
+
+	incinerate(s, v, c, start)
+}
+
+func incinerate(s *discordgo.Session, v *discordgo.VoiceStateUpdate, c Server, start <-chan time.Time) {
 	m, err := s.GuildMember(v.GuildID, v.UserID)
 	if err != nil {
 		lit.Error("Error creating member, %s", err)
