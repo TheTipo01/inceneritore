@@ -226,19 +226,27 @@ func incinerate(s *discordgo.Session, v *discordgo.VoiceStateUpdate, c Server, s
 
 	// We can't remove the role from a booster user, so we leave it there
 	var guildMemberParams discordgo.GuildMemberParams
-	if m.PremiumSince == nil {
-		guildMemberParams.Roles = &[]string{c.Role}
+	if c.Role != "" {
+		if m.PremiumSince == nil {
+			guildMemberParams.Roles = &[]string{c.Role}
+		} else {
+			guildMemberParams.Roles = &[]string{c.Role, c.BoostRole}
+		}
 	} else {
-		guildMemberParams.Roles = &[]string{c.Role, c.BoostRole}
+		if m.PremiumSince != nil {
+			guildMemberParams.Roles = &[]string{c.BoostRole}
+		}
 	}
 
-	// Add the role, so the user doesn't move
-	_, err = s.GuildMemberEdit(v.GuildID, v.UserID, &guildMemberParams)
-	if err != nil {
-		lit.Error("Error adding role, %s", err)
+	if guildMemberParams.Roles != nil && len(*guildMemberParams.Roles) > 0 {
+		// Add the role, so the user doesn't move
+		_, err = s.GuildMemberEdit(v.GuildID, v.UserID, &guildMemberParams)
+		if err != nil {
+			lit.Error("Error adding role, %s", err)
 
-		addRoles(s, v.UserID, v.GuildID)
-		return
+			addRoles(s, v.UserID, v.GuildID)
+			return
+		}
 	}
 
 	// Search for the user private message channel
